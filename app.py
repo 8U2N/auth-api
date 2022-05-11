@@ -15,89 +15,117 @@ ma = Marshmallow(app)
 CORS(app)
 bcrypt = Bcrypt(app)
 
-
-# class Name(db.Model):
-#     id = db.Column(db.Integer, primary_key=True, nullable=False)
-#     value1 = db.Column(db.String, unique=True, nullable=False)
-#     value2 = db.Column(db.Integer, unique=True, nullable=True)
-
-
-# def __init__(self, value1, value2, author):
-#     self.value1 = value1
-#     self.value2 = value2
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String, unique=True, nullable=False)
+    password = db.Column(db.String, unique=False, nullable=False)
+    email = db.Column(db.String, unique=True, nullable=False)
 
 
-# class NameSchema(ma.Schema):
-
-# class Meta:
-#     fields = ('id', 'Value1', 'Value2')
-
-
-# name_schema = NameSchema()
-# multi_name_schema = NameSchema(many=True)
-
-# # Endpoint to add a value
-# @app.route('/value/add', methods=['POST'])
-# def add_value():
-#     if request.content_type != 'application/json':
-#         return jsonify('Error: data MUST be sent as JSON!')
-
-#     post_data = request.get_json()
-#     value1 = post_data.get('value1')
-#     value2 = post_data.get('value2')
-
-#     if value1 == None:
-#     return jsonify('Error: Thou Shalt Provide A Value1!')
-#     if title == None:
-#     return jsonify('Error: Thou Shalt Provide A Value2!')
-
-#     new_record = Name(value1, value2)
-#     db.session.add(new_record)
-#     db.session.commit()
-
-# return jsonify(name_schema.dump(new_record))
+def __init__(self, username, password, email):
+    self.username = username
+    self.password = password
+    self.email = email
 
 
-# # Endpoint to query all values
-# @app.route('/value/get', methods=['GET'])
-# def get_all_values():
-#     all_records = db.session.query(Name).all()
-#     return jsonify(multi_name_schema.dump(all_records))
+class UserSchema(ma.Schema):
 
-# # Endpoint to query one value
-# @app.route('/value/get/<id>', methods=['GET'])
-# def get_value_id(id):
-#     one_value = db.session.query(Name).filter(Name.id == id).first()
-#     return jsonify(name_schema.dump(one_value))
+    class Meta:
+        fields = ('id', 'username', 'password', 'email')
 
-# # Endpoint to delete a value
-# @app.route('/value/delete/<id>', methods=['DELETE'])
-# def value_to_delete(id):
-#     delete_value = db.session.query(Name).filter(Name.id == id).first()
-#     db.session.delete(delete_value)
-#     db.session.commit()
-#     return jsonify("The value you chose is POOF! Gone, done, DELETED!")
 
-# # Endpoint to update/edit a value
-# @app.route('/value/update/<id>', methods=['PUT'])
-# def update_value_id(id):
-#     if request.content_type != 'application/json':
-#     return jsonify('Error: data must be sent as JSON!')
+user_schema = UserSchema()
+multi_user_schema = UserSchema(many=True)
 
-#     put_data = request.get_json()
-#     value1 = put_data.get('value1')
-#     value2 = put_data.get('value2')
+# # Endpoint to add a user
+@app.route('/user/add', methods=['POST'])
+def add_user():
+    if request.content_type != 'application/json':
+        return jsonify('Error: This is embarrassing...maybe you should, I dunno...TRY IT AS JSON!')
 
-#     value_to_update = db.session.query(Name).filter(Name.id == id).first()
+    post_data = request.get_json()
+    username = post_data.get('username')
+    password = post_data.get('password')
+    email = post_data.get('email')
 
-#     if value1 != None:
-#     value_to_update.value1 = value1
-#     if value2 != None:
-#     value_to_update.value2 = value2
+    if username == None:
+        return jsonify('Error: Provide A Username, ya DINGUS!')
+    if password == None:
+        return jsonify('Error: Provide A Password, ya DINGUS!')
+    if email == None:
+        return jsonify('Error: Provide An Email Address, ya DINGUS!')
+    pw_hash = bcrypt.generate_password_hash(password).decode('utf-8')
 
-# db.session.commit()
 
-# return jsonify(value_schema.dump(value_to_update))
+    new_user = User(username, pw_hash, email)
+    db.session.add(new_user)
+    db.session.commit()
+
+    return jsonify(user_schema.dump(new_user))
+
+# Verification Endpoint
+@app.route('user/verify', methods=['POST'])
+def verify():
+    if request.content_type != 'application/json':
+        return jsonify('Error: This is embarrassing...maybe you should, I dunno...TRY IT AS JSON!')
+
+    post_data = request.get_json()
+    username = post_data.get_json('username')
+    password = post_data.get_json('password')
+
+    user = db.session.query(User).filter(User.username == username).first()
+
+    if user is None:
+        return jsonify('Look what you did! You might be a user, but you couldn\'t be verified...')
+    if not bcrypt.check_password_hash(user.password, password):
+        return jsonify('Look what you did! You might be a user, but you couldn\'t be verified...')
+    
+    return jsonify('That\'s right, you\'re verified!')
+
+# # Endpoint to query all users
+@app.route('/user-roster/get', methods=['GET'])
+def get_all_users():
+    all_users = db.session.query(User).all()
+    return jsonify(multi_user_schema.dump(all_users))
+
+# # Endpoint to query one user
+@app.route('/user/get/<id>', methods=['GET'])
+def get_user_id(id):
+    one_user = db.session.query(User).filter(User.id == id).first()
+    return jsonify(user_schema.dump(one_user))
+
+# # Endpoint to delete a user
+@app.route('/user/delete/<id>', methods=['DELETE'])
+def user_to_delete(id):
+    delete_user = db.session.query(User).filter(User.id == id).first()
+    db.session.delete(delete_user)
+    db.session.commit()
+    return jsonify("You are not the user you once were...You're GONE!")
+
+# # Endpoint to update/edit a user
+@app.route('/user/update/<id>', methods=['PUT'])
+def update_user_id(id):
+    if request.content_type != 'application/json':
+        return jsonify('Error: This is embarrassing...maybe you should, I dunno...TRY IT AS JSON!')
+
+    put_data = request.get_json()
+    username = put_data.get('user')
+    pw_hash = put_data.get('pw_hash')
+    email = put_data.get('email')
+
+    user_to_update = db.session.query(User).filter(User.id == id).first()
+
+    if username != None:
+        user_to_update.username = username
+    if pw_hash != None:
+        user_to_update.pw_hash = pw_hash
+    if email != None:
+        user_to_update.email = email
+
+    db.session.commit()
+    return jsonify(user_schema.dump(user_to_update))
+
+
 
 if __name__ == '__main__':
     app.run(debug=True)
