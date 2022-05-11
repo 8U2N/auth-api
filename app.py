@@ -22,10 +22,10 @@ class User(db.Model):
     email = db.Column(db.String, unique=True, nullable=False)
 
 
-def __init__(self, username, password, email):
-    self.username = username
-    self.password = password
-    self.email = email
+    def __init__(self, username, password, email):
+        self.username = username
+        self.password = password
+        self.email = email
 
 
 class UserSchema(ma.Schema):
@@ -57,14 +57,14 @@ def add_user():
     pw_hash = bcrypt.generate_password_hash(password).decode('utf-8')
 
 
-    new_user = User(username, pw_hash, email)
-    db.session.add(new_user)
+    new_record = User(username, pw_hash, email)
+    db.session.add(new_record)
     db.session.commit()
 
-    return jsonify(user_schema.dump(new_user))
+    return jsonify(user_schema.dump(new_record))
 
 # Verification Endpoint
-@app.route('user/verify', methods=['POST'])
+@app.route('/user/verify', methods=['POST'])
 def verify():
     if request.content_type != 'application/json':
         return jsonify('Error: This is embarrassing...maybe you should, I dunno...TRY IT AS JSON!')
@@ -102,30 +102,41 @@ def user_to_delete(id):
     db.session.commit()
     return jsonify("You are not the user you once were...You're GONE!")
 
-# # Endpoint to update/edit a user
+# # Endpoint to update/edit a username/email
 @app.route('/user/update/<id>', methods=['PUT'])
 def update_user_id(id):
     if request.content_type != 'application/json':
         return jsonify('Error: This is embarrassing...maybe you should, I dunno...TRY IT AS JSON!')
 
     put_data = request.get_json()
-    username = put_data.get('user')
-    pw_hash = put_data.get('pw_hash')
+    username = put_data.get('username')
     email = put_data.get('email')
 
     user_to_update = db.session.query(User).filter(User.id == id).first()
 
+    if username & email == None:
+        return jsonify('Bruh, really? You gotta gimme somethin\'!')
     if username != None:
         user_to_update.username = username
-    if pw_hash != None:
-        user_to_update.pw_hash = pw_hash
     if email != None:
         user_to_update.email = email
 
     db.session.commit()
     return jsonify(user_schema.dump(user_to_update))
 
+# Endpoint to reset user password
+@app.route('/password/reset/<id>', methods=['PUT'])
+def reset_password(id):
+    if request.content_type != 'application/json':
+        return jsonify('Error: This is embarrassing...maybe you should, I dunno...TRY IT AS JSON!')
 
+    password = request.get_json().get("password")
+    user = db.session.query(User).filter(User.id == id).first()
+    pw_hash = bcrypt.generate_password_hash(password).decode('utf-8')
+    user.password = pw_hash
+    
+    db.session.commit()
+    return jsonify(user_schema.dump(user))
 
 if __name__ == '__main__':
     app.run(debug=True)
